@@ -21,9 +21,9 @@ def get_items():
     
     # Convert datetime objects to string for JSON serialization
     for item in items:
-        item['start_time'] = item['start_time'].isoformat()
-        item['end_time'] = item['end_time'].isoformat()
-        item['created_at'] = item['created_at'].isoformat()
+        item['start_time'] = item['start_time'].isoformat() + "Z"
+        item['end_time'] = item['end_time'].isoformat() + "Z"
+        item['created_at'] = item['created_at'].isoformat() + "Z"
         
     return jsonify(items)
 
@@ -44,9 +44,9 @@ def get_item(item_id):
     if not item:
         return jsonify({'message': 'Item not found'}), 404
         
-    item['start_time'] = item['start_time'].isoformat()
-    item['end_time'] = item['end_time'].isoformat()
-    item['created_at'] = item['created_at'].isoformat()
+    item['start_time'] = item['start_time'].isoformat() + "Z"
+    item['end_time'] = item['end_time'].isoformat() + "Z"
+    item['created_at'] = item['created_at'].isoformat() + "Z"
     
     return jsonify(item)
 

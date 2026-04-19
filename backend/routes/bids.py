@@ -21,7 +21,7 @@ def get_bids(item_id):
     conn.close()
     
     for bid in bids:
-        bid['created_at'] = bid['created_at'].isoformat()
+        bid['created_at'] = bid['created_at'].isoformat() + 'Z'
         bid['amount'] = float(bid['amount'])
         
     return jsonify(bids)
@@ -90,18 +90,30 @@ def place_bid(current_user_id):
         highest_proxy = cursor.fetchone()
         
         if highest_proxy:
-            # If the proxy is higher than the new bid, they auto-outbid the current user
-            if highest_proxy['max_amount'] >= bid_amount + Decimal('1.00'):
-                winning_user_id = highest_proxy['user_id']
-                winning_amount = min(bid_amount + Decimal('1.00'), highest_proxy['max_amount'])
+            other_proxy_max = highest_proxy['max_amount']
+            other_user_id = highest_proxy['user_id']
+            
+            # The highest the current user is willing to go
+            current_max = proxy_max_dec if (proxy_max and Decimal(str(proxy_max)) > bid_amount) else bid_amount
+            
+            if other_proxy_max >= current_max:
+                # The other user's proxy beats or ties our max bid
+                winning_user_id = other_user_id
+                winning_amount = min(current_max + Decimal('1.00'), other_proxy_max)
                 
-                # We need to record BOTH bids (1. current user's bid, 2. proxy outbid)
-                cursor.execute("INSERT INTO bids (item_id, user_id, amount) VALUES (%s, %s, %s)", (item_id, current_user_id, bid_amount))
-            elif highest_proxy['max_amount'] > bid_amount:
-                # Proxy slightly higher but not enough for full increment, proxy still wins
-                winning_user_id = highest_proxy['user_id']
-                winning_amount = highest_proxy['max_amount']
-                cursor.execute("INSERT INTO bids (item_id, user_id, amount) VALUES (%s, %s, %s)", (item_id, current_user_id, bid_amount))
+                # Record the current user's highest attempt
+                cursor.execute("INSERT INTO bids (item_id, user_id, amount) VALUES (%s, %s, %s)", (item_id, current_user_id, current_max))
+            else:
+                # The current user's max outbids the other user's proxy
+                winning_user_id = current_user_id
+                
+                # We need to minimally beat their proxy max by 1, but we can't go lower than our initial bid amount
+                desired_win = other_proxy_max + Decimal('1.00')
+                winning_amount = max(bid_amount, desired_win)
+                winning_amount = min(winning_amount, current_max)
+                
+                # Record the other user's proxy max that was defeated
+                cursor.execute("INSERT INTO bids (item_id, user_id, amount) VALUES (%s, %s, %s)", (item_id, other_user_id, other_proxy_max))
         
         # Insert the winning bid
         cursor.execute("INSERT INTO bids (item_id, user_id, amount) VALUES (%s, %s, %s)", (item_id, winning_user_id, winning_amount))

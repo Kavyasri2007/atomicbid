@@ -13,12 +13,19 @@ def register():
         data = request.get_json()
         username = data.get('username')
         password = data.get('password')
+        email = data.get('email')
+        phone = data.get('phone')
+        
+        import re
+        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            return jsonify({'message': 'Invalid email format provided'}), 400
+            
         if not username or not password: return jsonify({'message': 'Missing data'}), 400
         hashed_password = generate_password_hash(password)
         conn = get_db_connection()
         cursor = conn.cursor()
         try:
-            cursor.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, hashed_password))
+            cursor.execute("INSERT INTO users (username, password_hash, email, phone) VALUES (%s, %s, %s, %s)", (username, hashed_password, email, phone))
             conn.commit()
             return jsonify({'message': 'User created successfully'}), 201
         except Exception as e:
