@@ -18,6 +18,8 @@ function Navbar() {
         {token ? (
           <>
             <span className="nav-link">Welcome, {user.username}</span>
+            <Link to="/profile" className="nav-link">Profile</Link>
+            {user.is_admin && <Link to="/admin" className="nav-link" style={{ color: 'var(--secondary)' }}>Admin</Link>}
             <Link to="/create-item" className="btn btn-secondary" style={{padding: '8px 16px', display: 'inline-block'}}>Create Auction</Link>
             <button onClick={handleLogout} className="btn" style={{width: 'auto', padding: '8px 16px'}}>Logout</button>
           </>

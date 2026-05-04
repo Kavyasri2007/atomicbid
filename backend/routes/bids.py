@@ -68,9 +68,14 @@ def place_bid(current_user_id):
             conn.rollback()
             return jsonify({'message': 'Bid amount must be at least the base price'}), 400
             
-        # Optional: Proxy bidding logic updates
-        if proxy_max:
+        if proxy_max is not None and str(proxy_max).strip() != "":
             proxy_max_dec = Decimal(str(proxy_max))
+            if proxy_max_dec <= bid_amount:
+                conn.rollback()
+                return jsonify({'message': 'Maximum proxy bid must be greater than your bid amount'}), 400
+            
+        # Optional: Proxy bidding logic updates
+        if proxy_max is not None and str(proxy_max).strip() != "":
             cursor.execute("""
                 INSERT INTO proxy_bids (item_id, user_id, max_amount) 
                 VALUES (%s, %s, %s)
@@ -132,6 +137,54 @@ def place_bid(current_user_id):
         """, (winning_amount, winning_user_id, new_end_time, item_id))
         
         conn.commit()
+
+        # Emit real-time events
+        from extensions import socketio
+        cursor.execute("SELECT username FROM users WHERE id = %s", (winning_user_id,))
+        res = cursor.fetchone()
+        winning_username = res['username'] if res else "Unknown"
+
+        socketio.emit('bid_update', {
+            'item_id': item_id,
+            'new_amount': float(winning_amount),
+            'highest_bidder_username': winning_username,
+            'end_time': new_end_time.isoformat() + "Z",
+            'message': f"{winning_username} just placed a bid!"
+        })
+
+        outbid_user_id = item['highest_bidder_id']
+        if outbid_user_id and outbid_user_id != winning_user_id:
+            socketio.emit('notification', {
+                'type': 'outbid',
+                'user_id': outbid_user_id,
+                'item_id': item_id,
+                'item_title': item['title'],
+                'message': f"You were outbid on '{item['title']}'!"
+            })
+
+        # Notify the current user if they lost instantly to an existing proxy bid
+        if current_user_id != winning_user_id:
+            socketio.emit('notification', {
+                'type': 'outbid',
+                'user_id': current_user_id,
+                'item_id': item_id,
+                'item_title': item['title'],
+                'message': f"Your bid on '{item['title']}' was instantly outbid by an auto-bidder!"
+            })
+
+        # Watchlist notifications
+        cursor.execute("SELECT user_id FROM watchlist WHERE item_id = %s", (item_id,))
+        watchers = cursor.fetchall()
+        for w in watchers:
+            if w['user_id'] != current_user_id and w['user_id'] != outbid_user_id:
+                socketio.emit('notification', {
+                    'type': 'watchlist_update',
+                    'user_id': w['user_id'],
+                    'item_id': item_id,
+                    'item_title': item['title'],
+                    'message': f"Price increased to ${winning_amount} for watched item '{item['title']}'!"
+                })
+
         return jsonify({'message': 'Bid placed successfully', 'new_highest_bid': float(winning_amount), 'winner': winning_user_id == current_user_id}), 200
         
     except Exception as e:

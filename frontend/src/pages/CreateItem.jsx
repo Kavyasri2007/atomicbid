@@ -7,6 +7,8 @@ function CreateItem() {
   const [description, setDescription] = useState('');
   const [basePrice, setBasePrice] = useState('');
   const [duration, setDuration] = useState('24');
+  const [category, setCategory] = useState('Other');
+  const [image, setImage] = useState(null);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -20,14 +22,21 @@ function CreateItem() {
     }
 
     try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('base_price', basePrice);
+      formData.append('duration_hours', duration);
+      formData.append('category', category);
+      if (image) {
+        formData.append('image', image);
+      }
+
       await axios.post('http://127.0.0.1:5000/api/items/create', 
-        { 
-          title, 
-          description, 
-          base_price: parseFloat(basePrice),
-          duration_hours: parseInt(duration)
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
+        formData,
+        { headers: { 
+            Authorization: `Bearer ${token}`
+        } }
       );
       navigate('/');
     } catch (err) {
@@ -60,6 +69,35 @@ function CreateItem() {
             value={description} 
             onChange={(e) => setDescription(e.target.value)} 
           ></textarea>
+        </div>
+
+        <div className="input-group">
+          <label>Category</label>
+          <select 
+            className="input-field" 
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            style={{ background: 'rgba(15, 23, 42, 0.9)' }}
+          >
+            <option value="Electronics">Electronics</option>
+            <option value="Collectibles">Collectibles</option>
+            <option value="Fashion">Fashion</option>
+            <option value="Home">Home</option>
+            <option value="Books">Books</option>
+            <option value="Vehicles">Vehicles</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div className="input-group">
+          <label>Item Image (Optional)</label>
+          <input 
+            type="file" 
+            className="input-field"
+            accept="image/*"
+            style={{ paddingTop: '0.5rem' }}
+            onChange={(e) => setImage(e.target.files[0])} 
+          />
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

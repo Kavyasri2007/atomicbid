@@ -56,19 +56,23 @@ def login():
     user = cursor.fetchone()
     conn.close()
     
-    if not user or not check_password_hash(user['password_hash'], password):
-        return jsonify({'message': 'Invalid credentials'}), 401
+    if user and check_password_hash(user['password_hash'], password):
+        if user.get('is_banned'):
+            return jsonify({'message': 'Your account has been banned. Please contact support.'}), 403
+
+        token = jwt.encode({
+            'user_id': user['id'],
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+        }, Config.SECRET_KEY, algorithm='HS256')
         
-    token = jwt.encode({
-        'user_id': user['id'],
-        'username': user['username'],
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
-    }, Config.SECRET_KEY, algorithm='HS256')
-    
-    return jsonify({
-        'token': token,
-        'user': {
+        user_data = {
             'id': user['id'],
-            'username': user['username']
+            'username': user['username'],
+            'email': user['email'],
+            'phone_number': user['phone'],
+            'is_admin': bool(user.get('is_admin'))
         }
-    })
+        
+        return jsonify({'token': token, 'user': user_data}), 200
+        
+    return jsonify({'message': 'Invalid credentials'}), 401
