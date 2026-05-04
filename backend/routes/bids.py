@@ -3,6 +3,7 @@ from database import get_db_connection
 from utils import token_required
 import datetime
 from decimal import Decimal
+from services.payments import close_expired_auctions
 
 bids_bp = Blueprint('bids', __name__)
 
@@ -38,6 +39,21 @@ def place_bid(current_user_id):
     cursor = conn.cursor()
     
     try:
+        close_expired_auctions(cursor)
+
+        cursor.execute("SELECT payment_verified, stripe_payment_method_id, is_banned FROM users WHERE id = %s FOR UPDATE", (current_user_id,))
+        bidder = cursor.fetchone()
+        if not bidder or bidder.get('is_banned'):
+            conn.rollback()
+            return jsonify({'message': 'Your account cannot place bids'}), 403
+
+        if not bidder.get('payment_verified') or not bidder.get('stripe_payment_method_id'):
+            conn.rollback()
+            return jsonify({
+                'message': 'Verify a payment card before bidding. Winners are charged automatically when the auction ends.',
+                'requires_payment_verification': True
+            }), 402
+
         # Start transaction and lock the item row (Concurrency Control)
         cursor.execute("SELECT * FROM items WHERE id = %s FOR UPDATE", (item_id,))
         item = cursor.fetchone()

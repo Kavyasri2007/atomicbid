@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { socket } from '../socket';
 
 function Dashboard() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+  const [highlightedItems, setHighlightedItems] = useState({});
+
   // Filters
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
@@ -36,6 +38,11 @@ function Dashboard() {
     fetchItems();
 
     const handleBidUpdate = (data) => {
+      setHighlightedItems(prev => ({ ...prev, [data.item_id]: true }));
+      setTimeout(() => {
+        setHighlightedItems(prev => ({ ...prev, [data.item_id]: false }));
+      }, 1000);
+
       setItems(prevItems => prevItems.map(item => {
         if (item.id === data.item_id) {
           return {
@@ -54,27 +61,50 @@ function Dashboard() {
     // eslint-disable-next-line
   }, [search, category, minPrice, maxPrice, endingSoon]);
 
-  if (loading) return <div style={{textAlign: 'center'}}>Loading current auctions...</div>;
+  if (loading) return <div className="loading-state">Loading current auctions...</div>;
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1>Active Auctions</h1>
+    <motion.div
+      className="page-shell"
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+    >
+      <div className="market-hero">
+        <div>
+          <div className="eyebrow">Live marketplace</div>
+          <h1>Active Auctions</h1>
+          <p className="section-copy">Track momentum, filter fast, and jump into the auctions moving right now.</p>
+        </div>
+        <motion.div
+          className="ticker-rail"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+        >
+          <span className="ticker-chip">Live lots: {items.length}</span>
+          <span className="ticker-chip">Ending soon: {items.filter(item => new Date(item.end_time) - new Date() < 86400000 && new Date(item.end_time) > new Date()).length}</span>
+          <span className="ticker-chip">Active bids moving in real time</span>
+        </motion.div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: '2rem' }}>
-        {/* Filters Sidebar */}
-        <div className="glass-card" style={{ height: 'fit-content' }}>
-          <h3 style={{ marginBottom: '1rem' }}>Filters</h3>
-          
+      <div className="auction-layout">
+        <motion.aside
+          className="glass-card filters-card"
+          initial={{ opacity: 0, x: -16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.08 }}
+        >
+          <h3>Filters</h3>
+
           <div className="input-group">
-            <label>Search Title</label>
-            <input type="text" className="input-field" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
+            <label htmlFor="search">Search Title</label>
+            <input id="search" type="text" className="input-field" placeholder="Search auctions" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
 
           <div className="input-group">
-            <label>Category</label>
-            <select className="input-field" value={category} onChange={e => setCategory(e.target.value)}>
+            <label htmlFor="category">Category</label>
+            <select id="category" className="input-field" value={category} onChange={e => setCategory(e.target.value)}>
               <option value="All">All Categories</option>
               <option value="Electronics">Electronics</option>
               <option value="Collectibles">Collectibles</option>
@@ -87,62 +117,87 @@ function Dashboard() {
           </div>
 
           <div className="input-group">
-            <label>Min Price ($)</label>
-            <input type="number" className="input-field" value={minPrice} onChange={e => setMinPrice(e.target.value)} />
+            <label htmlFor="minPrice">Min Price ($)</label>
+            <input id="minPrice" type="number" className="input-field" value={minPrice} onChange={e => setMinPrice(e.target.value)} />
           </div>
 
           <div className="input-group">
-            <label>Max Price ($)</label>
-            <input type="number" className="input-field" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} />
+            <label htmlFor="maxPrice">Max Price ($)</label>
+            <input id="maxPrice" type="number" className="input-field" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
-            <input type="checkbox" id="endingSoon" checked={endingSoon} onChange={e => setEndingSoon(e.target.checked)} style={{ width: '18px', height: '18px' }} />
-            <label htmlFor="endingSoon" style={{ cursor: 'pointer' }}>Ending in &lt; 24h</label>
+          <div className="checkbox-row">
+            <input type="checkbox" id="endingSoon" checked={endingSoon} onChange={e => setEndingSoon(e.target.checked)} />
+            <label htmlFor="endingSoon">Ending in &lt; 24h</label>
           </div>
-        </div>
+        </motion.aside>
 
-        {/* Results Grid */}
-        <div>
+        <section>
           {items.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)' }}>No items match your criteria.</p>
+            <div className="empty-state">No items match your criteria.</div>
           ) : (
-            <div className="grid">
-              {items.map(item => {
-                const isEnded = new Date(item.end_time) <= new Date() || item.status === 'ended';
-                
-                return (
-                  <div key={item.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                    {item.image_url && (
-                      <div style={{ marginBottom: '1rem', height: '160px', overflow: 'hidden', borderRadius: '8px' }}>
-                        <img src={`http://127.0.0.1:5000${item.image_url}`} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <motion.div className="grid" layout>
+              <AnimatePresence>
+                {items.map(item => {
+                  const isEnded = new Date(item.end_time) <= new Date() || item.status === 'ended';
+
+                  return (
+                    <motion.article
+                      key={item.id}
+                      className={`auction-card ${highlightedItems[item.id] ? 'bid-update-glow is-hot' : ''}`}
+                      layout
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      whileHover={{ y: -6, boxShadow: '0 28px 70px rgba(24, 24, 27, 0.16)' }}
+                      transition={{ duration: 0.22 }}
+                    >
+                      {item.image_url && (
+                        <div className="auction-image">
+                          <img src={`http://127.0.0.1:5000${item.image_url}`} alt={item.title} />
+                          <span className="quick-preview">Quick bid preview</span>
+                        </div>
+                      )}
+                      <div className="auction-body">
+                        <div>
+                          <h3 className="auction-title">{item.title}</h3>
+                          <span className={`status-pill ${isEnded ? 'status-ended' : 'status-active'}`}>
+                            {isEnded ? 'Ended' : 'Live now'}
+                          </span>
+                        </div>
+
+                        <div className="meta-row">
+                          <span>Current bid</span>
+                          <motion.span
+                            className="price-sm"
+                            key={item.current_highest_bid}
+                            initial={{ scale: 1.08, color: '#f59e0b' }}
+                            animate={{ scale: 1, color: '#10b981' }}
+                          >
+                            ${item.current_highest_bid}
+                          </motion.span>
+                        </div>
+
+                        {item.highest_bidder_username && (
+                          <div className="meta-row">
+                            <span>Leading</span>
+                            <strong>{item.highest_bidder_username}</strong>
+                          </div>
+                        )}
+
+                        <Link to={`/item/${item.id}`} className="btn btn-accent">
+                          View Details
+                        </Link>
                       </div>
-                    )}
-                    <h3 style={{ marginBottom: '0.5rem' }}>{item.title}</h3>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Price:</span>
-                      <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>${item.current_highest_bid}</span>
-                    </div>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Status:</span>
-                      <span style={{ color: isEnded ? 'var(--danger)' : 'var(--secondary)' }}>
-                        {isEnded ? 'Ended' : 'Active'}
-                      </span>
-                    </div>
-                    
-                    <Link to={`/item/${item.id}`} className="btn" style={{ textAlign: 'center', marginTop: 'auto' }}>
-                      View Details
-                    </Link>
-                  </div>
-                );
-              })}
-            </div>
+                    </motion.article>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.div>
           )}
-        </div>
+        </section>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

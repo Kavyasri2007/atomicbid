@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     email VARCHAR(255) DEFAULT NULL,
     phone VARCHAR(20) DEFAULT NULL,
+    stripe_customer_id VARCHAR(255) DEFAULT NULL,
+    stripe_payment_method_id VARCHAR(255) DEFAULT NULL,
+    payment_verified BOOLEAN DEFAULT FALSE,
+    payment_verified_at DATETIME DEFAULT NULL,
     is_admin BOOLEAN DEFAULT FALSE,
     is_banned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -83,4 +87,21 @@ CREATE TABLE IF NOT EXISTS winners (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (item_id) REFERENCES items(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS auction_payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    item_id INT UNIQUE NOT NULL,
+    winner_id INT NOT NULL,
+    seller_id INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    currency VARCHAR(10) DEFAULT 'usd',
+    stripe_payment_intent_id VARCHAR(255) DEFAULT NULL,
+    status ENUM('pending', 'requires_action', 'succeeded', 'failed', 'canceled') DEFAULT 'pending',
+    failure_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES items(id),
+    FOREIGN KEY (winner_id) REFERENCES users(id),
+    FOREIGN KEY (seller_id) REFERENCES users(id)
 );

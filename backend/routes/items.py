@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from database import get_db_connection
 from utils import token_required
 import datetime
+from services.payments import close_expired_auctions, format_payment
 
 items_bp = Blueprint('items', __name__)
 
@@ -42,9 +43,17 @@ def get_items():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(query, tuple(params))
-    items = cursor.fetchall()
-    conn.close()
+    try:
+        close_expired_auctions(cursor)
+        conn.commit()
+
+        cursor.execute(query, tuple(params))
+        items = cursor.fetchall()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
     
     for item in items:
         item['start_time'] = item['start_time'].isoformat() + "Z"
@@ -57,15 +66,26 @@ def get_items():
 def get_item(item_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT i.*, u.username as owner_username, hb.username as highest_bidder_username
-        FROM items i 
-        JOIN users u ON i.user_id = u.id 
-        LEFT JOIN users hb ON i.highest_bidder_id = hb.id
-        WHERE i.id = %s
-    """, (item_id,))
-    item = cursor.fetchone()
-    conn.close()
+    try:
+        close_expired_auctions(cursor)
+        conn.commit()
+
+        cursor.execute("""
+            SELECT i.*, u.username as owner_username, hb.username as highest_bidder_username
+            FROM items i 
+            JOIN users u ON i.user_id = u.id 
+            LEFT JOIN users hb ON i.highest_bidder_id = hb.id
+            WHERE i.id = %s
+        """, (item_id,))
+        item = cursor.fetchone()
+
+        cursor.execute("SELECT * FROM auction_payments WHERE item_id = %s", (item_id,))
+        payment = cursor.fetchone()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
     
     if not item:
         return jsonify({'message': 'Item not found'}), 404
@@ -73,6 +93,7 @@ def get_item(item_id):
     item['start_time'] = item['start_time'].isoformat() + "Z"
     item['end_time'] = item['end_time'].isoformat() + "Z"
     item['created_at'] = item['created_at'].isoformat() + "Z"
+    item['payment'] = format_payment(payment)
     
     return jsonify(item)
 

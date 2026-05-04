@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -65,115 +66,157 @@ function Admin() {
     }
   };
 
-  if (loading) return <div style={{textAlign: 'center'}}>Loading Admin Panel...</div>;
+  if (loading) return <div className="loading-state">Loading Admin Panel...</div>;
+
+  const tabs = [
+    { id: 'stats', label: 'Stats' },
+    { id: 'users', label: 'Users' },
+    { id: 'items', label: 'Auctions' }
+  ];
 
   return (
-    <div>
-      <h1 style={{ marginBottom: '2rem' }}>Admin Dashboard </h1>
-
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem' }}>
-        <button onClick={() => setActiveTab('stats')} className="btn" style={{ background: activeTab === 'stats' ? 'var(--primary)' : 'transparent' }}>Stats</button>
-        <button onClick={() => setActiveTab('users')} className="btn" style={{ background: activeTab === 'users' ? 'var(--primary)' : 'transparent' }}>Users</button>
-        <button onClick={() => setActiveTab('items')} className="btn" style={{ background: activeTab === 'items' ? 'var(--primary)' : 'transparent' }}>Auctions</button>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+      <div className="page-header">
+        <div>
+          <div className="eyebrow">Control room</div>
+          <h1>Admin Dashboard</h1>
+          <p className="section-copy">Monitor platform activity, users, and auction inventory.</p>
+        </div>
       </div>
 
-      {activeTab === 'stats' && stats && (
-        <div className="grid">
-          <div className="glass-card" style={{ textAlign: 'center' }}>
-            <h3>Total Users</h3>
-            <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--secondary)' }}>{stats.total_users}</div>
-          </div>
-          <div className="glass-card" style={{ textAlign: 'center' }}>
-            <h3>Total Items</h3>
-            <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--secondary)' }}>{stats.total_items}</div>
-          </div>
-          <div className="glass-card" style={{ textAlign: 'center' }}>
-            <h3>Total Bids</h3>
-            <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--secondary)' }}>{stats.total_bids}</div>
-          </div>
-          <div className="glass-card" style={{ textAlign: 'center' }}>
-            <h3>Total Revenue Flow</h3>
-            <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--success)' }}>${stats.total_revenue.toFixed(2)}</div>
-          </div>
-        </div>
-      )}
+      <div className="tabs">
+        {tabs.map(tab => (
+          <motion.button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`btn tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            whileTap={{ scale: 0.97 }}
+            type="button"
+          >
+            {tab.label}
+          </motion.button>
+        ))}
+      </div>
 
-      {activeTab === 'users' && (
-        <div className="glass-card" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                <th style={{ padding: '1rem' }}>ID</th>
-                <th style={{ padding: '1rem' }}>Username</th>
-                <th style={{ padding: '1rem' }}>Email</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '1rem' }}>{u.id}</td>
-                  <td style={{ padding: '1rem' }}>{u.username} {u.is_admin ? '(Admin)' : ''}</td>
-                  <td style={{ padding: '1rem' }}>{u.email}</td>
-                  <td style={{ padding: '1rem', color: u.is_banned ? 'var(--danger)' : 'var(--success)' }}>
-                    {u.is_banned ? 'Banned' : 'Active'}
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    {!u.is_admin && (
-                      <button 
-                        onClick={() => handleToggleBan(u.id)}
-                        className="btn" 
-                        style={{ padding: '5px 10px', fontSize: '0.8rem', background: u.is_banned ? 'var(--success)' : 'var(--danger)' }}
+      <AnimatePresence mode="wait">
+        {activeTab === 'stats' && stats && (
+          <motion.div 
+            key="stats" 
+            className="grid" 
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+            variants={{
+              show: {
+                transition: {
+                  staggerChildren: 0.1
+                }
+              }
+            }}
+          >
+            {[
+              { label: 'Total Users', value: stats.total_users },
+              { label: 'Total Items', value: stats.total_items },
+              { label: 'Total Bids', value: stats.total_bids },
+              { label: 'Total Revenue Flow', value: `$${stats.total_revenue.toFixed(2)}`, color: 'var(--primary-hover)' }
+            ].map((s, idx) => (
+              <motion.div 
+                key={idx}
+                className="glass-card interactive-surface" 
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  show: { opacity: 1, y: 0 }
+                }}
+                whileHover={{ y: -8, transition: { duration: 0.2 } }}
+              >
+                <h3>{s.label}</h3>
+                <div className="stats-value" style={s.color ? { color: s.color } : {}}>{s.value}</div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+
+        {activeTab === 'users' && (
+          <motion.div key="users" className="glass-card table-wrap" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(u => (
+                  <tr key={u.id}>
+                    <td>{u.id}</td>
+                    <td>{u.username} {u.is_admin ? '(Admin)' : ''}</td>
+                    <td>{u.email}</td>
+                    <td style={{ color: u.is_banned ? 'var(--danger)' : 'var(--success)', fontWeight: 850 }}>
+                      {u.is_banned ? 'Banned' : 'Active'}
+                    </td>
+                    <td>
+                      {!u.is_admin && (
+                        <motion.button
+                          onClick={() => handleToggleBan(u.id)}
+                          className={`btn ${u.is_banned ? '' : 'btn-danger'}`}
+                          style={{ minHeight: 34, padding: '0.35rem 0.7rem', fontSize: '0.82rem' }}
+                          whileTap={{ scale: 0.96 }}
+                          type="button"
+                        >
+                          {u.is_banned ? 'Unban' : 'Ban'}
+                        </motion.button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </motion.div>
+        )}
+
+        {activeTab === 'items' && (
+          <motion.div key="items" className="glass-card table-wrap" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Title</th>
+                  <th>Seller</th>
+                  <th>Highest Bid</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(item => (
+                  <tr key={item.id}>
+                    <td>{item.id}</td>
+                    <td>{item.title}</td>
+                    <td>{item.owner_username}</td>
+                    <td className="price-sm">${item.current_highest_bid}</td>
+                    <td>{item.status}</td>
+                    <td>
+                      <motion.button
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="btn btn-danger"
+                        style={{ minHeight: 34, padding: '0.35rem 0.7rem', fontSize: '0.82rem' }}
+                        whileTap={{ scale: 0.96 }}
+                        type="button"
                       >
-                        {u.is_banned ? 'Unban' : 'Ban'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === 'items' && (
-        <div className="glass-card" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                <th style={{ padding: '1rem' }}>ID</th>
-                <th style={{ padding: '1rem' }}>Title</th>
-                <th style={{ padding: '1rem' }}>Seller</th>
-                <th style={{ padding: '1rem' }}>Highest Bid</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(item => (
-                <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '1rem' }}>{item.id}</td>
-                  <td style={{ padding: '1rem' }}>{item.title}</td>
-                  <td style={{ padding: '1rem' }}>{item.owner_username}</td>
-                  <td style={{ padding: '1rem' }}>${item.current_highest_bid}</td>
-                  <td style={{ padding: '1rem' }}>{item.status}</td>
-                  <td style={{ padding: '1rem' }}>
-                    <button 
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="btn" 
-                      style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'var(--danger)' }}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+                        Remove
+                      </motion.button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 

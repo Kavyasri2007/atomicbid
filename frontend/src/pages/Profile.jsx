@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
 function Profile() {
@@ -29,80 +30,106 @@ function Profile() {
     fetchDashboard();
   }, [navigate]);
 
-  if (loading) return <div style={{textAlign: 'center'}}>Loading your dashboard...</div>;
-  if (!data) return <div style={{textAlign: 'center'}}>Failed to load dashboard</div>;
+  if (loading) return <div className="loading-state">Loading your dashboard...</div>;
+  if (!data) return <div className="empty-state">Failed to load dashboard</div>;
 
   const tabs = [
     { id: 'my_bids', label: 'Active Bids' },
-    { id: 'watchlist', label: 'Watchlist ⭐' },
+    { id: 'watchlist', label: 'Watchlist' },
     { id: 'my_auctions', label: 'My Auctions' },
     { id: 'won_auctions', label: 'Won' },
     { id: 'lost_auctions', label: 'Lost' }
   ];
 
   const renderItems = (itemsList) => {
-    if (itemsList.length === 0) return <p style={{ color: 'var(--text-muted)' }}>No items found in this section.</p>;
-    
+    if (itemsList.length === 0) return <div className="empty-state">No items found in this section.</div>;
+
     return (
-      <div className="grid">
+      <motion.div className="grid" layout>
         {itemsList.map(item => {
           const isEnded = new Date(item.end_time) <= new Date() || item.status === 'ended';
           return (
-            <div key={item.id} className="glass-card" style={{ padding: '1.5rem' }}>
+            <motion.article
+              key={item.id}
+              className="auction-card"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ y: -5, boxShadow: '0 24px 60px rgba(24, 24, 27, 0.14)' }}
+            >
               {item.image_url && (
-                <div style={{ marginBottom: '1rem', height: '120px', overflow: 'hidden', borderRadius: '8px' }}>
-                  <img src={`http://127.0.0.1:5000${item.image_url}`} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div className="auction-image">
+                  <img src={`http://127.0.0.1:5000${item.image_url}`} alt={item.title} />
+                  <span className="quick-preview">Open auction</span>
                 </div>
               )}
-              <h4 style={{ marginBottom: '0.5rem' }}>{item.title}</h4>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Highest Bid:</span>
-                <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>${item.current_highest_bid}</span>
+              <div className="auction-body">
+                <div>
+                  <h4 className="auction-title">{item.title}</h4>
+                  <span className={`status-pill ${isEnded ? 'status-ended' : 'status-active'}`}>{isEnded ? 'Ended' : 'Active'}</span>
+                </div>
+                <div className="meta-row">
+                  <span>Highest Bid</span>
+                  <span className="price-sm">${item.current_highest_bid}</span>
+                </div>
+                <Link to={`/item/${item.id}`} className="btn btn-accent">
+                  View Item
+                </Link>
               </div>
-              <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Status: </span>
-                <span style={{ color: isEnded ? 'var(--danger)' : 'var(--secondary)' }}>{isEnded ? 'Ended' : 'Active'}</span>
-              </div>
-              <Link to={`/item/${item.id}`} className="btn" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
-                View Item
-              </Link>
-            </div>
+            </motion.article>
           );
         })}
-      </div>
+      </motion.div>
     );
   };
 
   return (
-    <div>
-      <h1 style={{ marginBottom: '2rem' }}>User Dashboard</h1>
-      
-      <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid var(--glass-border)' }}>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+      <div className="profile-banner">
+        <div>
+          <div className="eyebrow">Portfolio</div>
+          <h1>User Dashboard</h1>
+          <p className="section-copy">Track bids, watched lots, owned auctions, and outcomes in one place.</p>
+        </div>
+        <div className="dashboard-actions">
+          <div className="profile-metric">
+            <div className="stat-label">Payments</div>
+            <div className="stat-number" style={{ color: data.payment_verified ? 'var(--success)' : 'var(--danger)' }}>
+              {data.payment_verified ? 'Ready' : 'Verify'}
+            </div>
+          </div>
+          <div className="profile-metric">
+            <div className="stat-label">Watching</div>
+            <div className="stat-number" style={{ color: 'var(--accent)' }}>{data.watchlist?.length || 0}</div>
+          </div>
+          <div className="profile-metric">
+            <div className="stat-label">Won</div>
+            <div className="stat-number" style={{ color: 'var(--success)' }}>{data.won_auctions?.length || 0}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="tabs">
         {tabs.map(tab => (
-          <button
+          <motion.button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            style={{
-              background: activeTab === tab.id ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.3s'
-            }}
+            className={`btn tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            whileTap={{ scale: 0.97 }}
+            type="button"
           >
             {tab.label} ({data[tab.id]?.length || 0})
-          </button>
+          </motion.button>
         ))}
       </div>
 
       <div style={{ minHeight: '300px' }}>
-        {renderItems(data[activeTab])}
+        <AnimatePresence mode="wait">
+          <motion.div key={activeTab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            {renderItems(data[activeTab])}
+          </motion.div>
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

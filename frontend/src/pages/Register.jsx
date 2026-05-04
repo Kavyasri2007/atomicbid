@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import axios from 'axios';
 
 function Register() {
@@ -41,9 +42,15 @@ function Register() {
   };
 
   return (
-    <div className="glass-card" style={{ maxWidth: '400px', margin: '4rem auto' }}>
-      <h2 style={{ textAlign: 'center' }}>Create Account</h2>
-      {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</div>}
+    <motion.div
+      className="glass-card auth-card interactive-surface"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32 }}
+    >
+      <div className="eyebrow" style={{ textAlign: 'center' }}>Join the floor</div>
+      <h2 style={{ textAlign: 'center', marginBottom: '1.25rem' }}>Create Account</h2>
+      {error && <div className="alert alert-danger">{error}</div>}
       
       <form onSubmit={handleRegister}>
         <div className="input-group">
@@ -68,7 +75,7 @@ function Register() {
         <div className="input-group">
           <label>Phone Number</label>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>+91</span>
+            <span className="phone-prefix">+91</span>
             <input 
               type="tel" 
               className="input-field"
@@ -105,12 +112,12 @@ function Register() {
             </button>
           </div>
         </div>
-        <button type="submit" className="btn">Register</button>
+        <motion.button whileTap={{ scale: 0.97 }} type="submit" className="btn btn-accent" style={{ width: '100%' }}>Register</motion.button>
       </form>
       <p style={{ marginTop: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        Already have an account? <Link to="/login" style={{ color: 'var(--primary)' }}>Login</Link>
+        Already have an account? <Link to="/login" className="auth-link">Login</Link>
       </p>
-    </div>
+    </motion.div>
   );
 }
 

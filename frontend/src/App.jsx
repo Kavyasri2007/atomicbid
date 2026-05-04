@@ -12,6 +12,8 @@ import CreateItem from './pages/CreateItem';
 import Profile from './pages/Profile';
 import Admin from './pages/Admin';
 
+import Background from './components/Background';
+
 function App() {
   useEffect(() => {
     const handleNotification = (data) => {
@@ -32,7 +34,8 @@ function App() {
   return (
     <Router>
       <div className="app-container">
-        <ToastContainer theme="dark" position="bottom-right" />
+        <Background />
+        <ToastContainer theme="dark" position="bottom-right" toastClassName="toastify-shell" />
         <Navbar />
         <Routes>
           <Route path="/" element={<Dashboard />} />

@@ -23,12 +23,14 @@ def create_app():
     from routes.users import users_bp
     from routes.admin import admin_bp
     from routes.reviews import reviews_bp
+    from routes.payments import payments_bp
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(items_bp, url_prefix='/api/items')
     app.register_blueprint(bids_bp, url_prefix='/api/bids')
     app.register_blueprint(users_bp, url_prefix='/api/users')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(reviews_bp, url_prefix='/api/reviews')
+    app.register_blueprint(payments_bp, url_prefix='/api/payments')
 
     @app.route('/uploads/<path:filename>')
     def uploaded_file(filename):

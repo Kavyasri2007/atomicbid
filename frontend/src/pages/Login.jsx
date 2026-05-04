@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import axios from 'axios';
 
 function Login() {
@@ -22,9 +23,15 @@ function Login() {
   };
 
   return (
-    <div className="glass-card" style={{ maxWidth: '400px', margin: '4rem auto' }}>
-      <h2 style={{ textAlign: 'center' }}>Welcome Back</h2>
-      {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</div>}
+    <motion.div
+      className="glass-card auth-card interactive-surface"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32 }}
+    >
+      <div className="eyebrow" style={{ textAlign: 'center' }}>Bid desk access</div>
+      <h2 style={{ textAlign: 'center', marginBottom: '1.25rem' }}>Welcome Back</h2>
+      {error && <div className="alert alert-danger">{error}</div>}
       
       <form onSubmit={handleLogin}>
         <div className="input-group">
@@ -62,12 +69,12 @@ function Login() {
             </button>
           </div>
         </div>
-        <button type="submit" className="btn">Login</button>
+        <motion.button whileTap={{ scale: 0.97 }} type="submit" className="btn btn-accent" style={{ width: '100%' }}>Login</motion.button>
       </form>
       <p style={{ marginTop: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        Don't have an account? <Link to="/register" style={{ color: 'var(--primary)' }}>Register</Link>
+        Don't have an account? <Link to="/register" className="auth-link">Register</Link>
       </p>
-    </div>
+    </motion.div>
   );
 }
 

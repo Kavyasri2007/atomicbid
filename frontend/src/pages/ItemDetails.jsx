@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { socket } from '../socket';
+import PaymentVerification from '../components/PaymentVerification';
 
 function ItemDetails() {
   const { id } = useParams();
@@ -15,7 +17,9 @@ function ItemDetails() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [timeLeft, setTimeLeft] = useState('');
-  
+  const [bidFlash, setBidFlash] = useState(false);
+  const [paymentVerified, setPaymentVerified] = useState(false);
+
   const [isWatching, setIsWatching] = useState(false);
   const endingNotified = useRef(false);
 
@@ -44,7 +48,7 @@ function ItemDetails() {
       } catch (e) {
         console.error("Reviews check failed", e);
       }
-      
+
       if (token) {
         try {
           const watchRes = await axios.get(`http://127.0.0.1:5000/api/items/${id}/watchlist`, {
@@ -63,6 +67,22 @@ function ItemDetails() {
       setError('Failed to load item details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPaymentStatus = async () => {
+    if (!token) {
+      setPaymentVerified(false);
+      return;
+    }
+
+    try {
+      const res = await axios.get('http://127.0.0.1:5000/api/payments/status', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPaymentVerified(Boolean(res.data.payment_verified && res.data.has_payment_method));
+    } catch (err) {
+      setPaymentVerified(false);
     }
   };
 
@@ -88,16 +108,19 @@ function ItemDetails() {
 
   useEffect(() => {
     fetchData();
+    fetchPaymentStatus();
 
     const handleBidUpdate = (data) => {
       if (data.item_id === parseInt(id)) {
+        setBidFlash(true);
+        setTimeout(() => setBidFlash(false), 1000);
         setItem(prevItem => ({
           ...prevItem,
           current_highest_bid: data.new_amount,
           highest_bidder_username: data.highest_bidder_username,
           end_time: data.end_time
         }));
-        
+
         setBids(prevBids => [{
           id: Date.now(),
           username: data.highest_bidder_username,
@@ -105,7 +128,7 @@ function ItemDetails() {
           created_at: new Date().toISOString()
         }, ...prevBids]);
 
-        toast.info(data.message, { icon: "🔥" });
+        toast.info(data.message, { icon: "!" });
       }
     };
 
@@ -117,7 +140,7 @@ function ItemDetails() {
   const updateTimer = (endDate, currentItem) => {
     const now = new Date();
     const diff = endDate - now;
-    
+
     if (diff <= 0) {
       setTimeLeft('Auction Ended');
       return;
@@ -126,10 +149,10 @@ function ItemDetails() {
     if (diff <= 60000 && !endingNotified.current) {
       endingNotified.current = true;
       if (currentItem && currentItem.user_id !== user.id) {
-        toast.warning(`⏳ Auction for ${currentItem.title} is ending soon!`);
+        toast.warning(`Auction for ${currentItem.title} is ending soon!`);
       }
     }
-    
+
     const h = Math.floor(diff / (1000 * 60 * 60));
     const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     const s = Math.floor((diff % (1000 * 60)) / 1000);
@@ -147,7 +170,7 @@ function ItemDetails() {
   useEffect(() => {
     if (timeLeft === 'Auction Ended' && item) {
       if (item.highest_bidder_username === user.username) {
-        toast.success(`🎉 You won ${item.title}!`, { autoClose: false });
+        toast.success(`You won ${item.title}!`, { autoClose: false });
       } else if (item.user_id !== user.id && item.highest_bidder_username) {
         toast.info(`Auction ended. ${item.highest_bidder_username} won.`);
       }
@@ -160,12 +183,12 @@ function ItemDetails() {
       navigate('/login');
       return;
     }
-    
+
     if (proxyMax && parseFloat(proxyMax) <= parseFloat(bidAmount)) {
       toast.error('Maximum proxy bid must be greater than your bid amount!');
       return;
     }
-    
+
     setError('');
     setSuccess('');
 
@@ -179,12 +202,15 @@ function ItemDetails() {
       const res = await axios.post('http://127.0.0.1:5000/api/bids/place', payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       setSuccess(res.data.winner ? 'You are currently the highest bidder!' : 'You were outbid by a proxy!');
       setBidAmount('');
       setProxyMax('');
       fetchData(); // refresh
     } catch (err) {
+      if (err.response?.data?.requires_payment_verification) {
+        setPaymentVerified(false);
+      }
       setError(err.response?.data?.message || 'Failed to place bid');
     }
   };
@@ -205,109 +231,148 @@ function ItemDetails() {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (!item) return <div>Item not found</div>;
+  if (loading) return <div className="loading-state">Loading auction desk...</div>;
+  if (!item) return <div className="empty-state">Item not found</div>;
 
   const isEnded = timeLeft === 'Auction Ended' || item.status === 'ended';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 2fr) 1fr', gap: '2rem' }}>
-      {/* Main Column */}
-      <div className="glass-card">
+    <motion.div
+      className="detail-layout"
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+    >
+      <main className="glass-card">
         {item.image_url && (
-          <div style={{ marginBottom: '2rem', borderRadius: '8px', overflow: 'hidden', maxHeight: '400px', display: 'flex', justifyContent: 'center', background: 'rgba(0,0,0,0.2)' }}>
-            <img src={`http://127.0.0.1:5000${item.image_url}`} alt={item.title} style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
-          </div>
+          <motion.div className="detail-image" layoutId={`auction-image-${item.id}`}>
+            <img src={`http://127.0.0.1:5000${item.image_url}`} alt={item.title} />
+          </motion.div>
         )}
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+
+        <div className="detail-heading">
           <div>
-            <h1 style={{ marginBottom: '0.5rem' }}>{item.title}</h1>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-              Listed by {item.owner_username} &bull; Category: {item.category || 'Other'}
-              <br />
-              <span style={{ color: 'var(--warning)', marginTop: '0.5rem', display: 'inline-block' }}>
-                {sellerStats.total_reviews > 0 ? `⭐ ${sellerStats.average_rating} / 5.0 (${sellerStats.total_reviews} reviews)` : '⭐ No reviews yet'}
-              </span>
+            <div className="eyebrow">{item.category || 'Other'} auction</div>
+            <h1>{item.title}</h1>
+            <p className="section-copy">
+              Listed by {item.owner_username} | {sellerStats.total_reviews > 0 ? `${sellerStats.average_rating} / 5.0 (${sellerStats.total_reviews} reviews)` : 'No seller reviews yet'}
             </p>
           </div>
-          <button 
-            onClick={handleToggleWatchlist} 
-            className="btn btn-secondary" 
-            style={{ width: 'auto', background: isWatching ? 'var(--primary)' : 'rgba(255,255,255,0.1)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={handleToggleWatchlist}
+            className={`btn ${isWatching ? 'btn-accent' : 'btn-secondary'}`}
+            type="button"
           >
-            {isWatching ? '⭐ Watching' : '☆ Watch'}
-          </button>
+            {isWatching ? 'Watching' : 'Watch'}
+          </motion.button>
         </div>
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+
+        <div className="auction-stats">
+          <motion.div className="stat-tile interactive-surface" whileHover={{ y: -3 }}>
+            <div className="stat-label">Status</div>
+            <div className="stat-number">{isEnded ? 'Ended' : 'Live'}</div>
+          </motion.div>
+          <motion.div className="stat-tile interactive-surface" whileHover={{ y: -3 }}>
+            <div className="stat-label">Bid count</div>
+            <div className="stat-number">{bids.length}</div>
+          </motion.div>
+          <motion.div className="stat-tile interactive-surface" whileHover={{ y: -3 }}>
+            <div className="stat-label">Leader</div>
+            <div className="stat-number">{item.highest_bidder_username || 'Open'}</div>
+          </motion.div>
+        </div>
+
+        <motion.div className={`bid-strip ${bidFlash ? 'bid-update-glow' : ''}`} animate={bidFlash ? { scale: [1, 1.012, 1] } : { scale: 1 }}>
           <div>
-            <div style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Current Highest Bid</div>
-            <div className="price">${item.current_highest_bid}</div>
+            <div className="meta-row">Current Highest Bid</div>
+            <motion.div
+              className="price"
+              key={item.current_highest_bid}
+              initial={{ y: -8, opacity: 0.65 }}
+              animate={{ y: 0, opacity: 1 }}
+            >
+              ${item.current_highest_bid}
+            </motion.div>
             {item.highest_bidder_username && (
-              <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>by {item.highest_bidder_username}</div>
+              <div className="meta-row">by {item.highest_bidder_username}</div>
             )}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Time Remaining</div>
-            <div className="timer" style={{ color: isEnded ? 'var(--danger)' : 'var(--secondary)' }}>
+          <div>
+            <div className="meta-row">Time Remaining</div>
+            <div className="timer" style={{ color: isEnded ? 'var(--danger)' : '#92400e' }}>
               {timeLeft}
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div style={{ marginBottom: '2rem' }}>
+        <section style={{ marginBottom: '1.5rem' }}>
           <h3>Description</h3>
-          <p style={{ lineHeight: '1.6' }}>{item.description || 'No description provided.'}</p>
-        </div>
+          <p className="section-copy">{item.description || 'No description provided.'}</p>
+        </section>
 
         {!isEnded && item.user_id !== user.id && (
-          <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid var(--glass-border)' }}>
+          <section style={{ paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
             <h3>Place a Bid</h3>
-            {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</div>}
-            {success && <div style={{ color: 'var(--success)', marginBottom: '1rem' }}>{success}</div>}
-            
-            <form onSubmit={handlePlaceBid} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div className="input-group" style={{ flex: '1', margin: 0 }}>
-                <label>Bid Amount ($)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  className="input-field" 
-                  value={bidAmount} onChange={e => setBidAmount(e.target.value)} 
-                  required 
-                  min={item.current_highest_bid ? parseFloat(item.current_highest_bid) + 0.01 : parseFloat(item.base_price)}
-                />
-              </div>
-              <div className="input-group" style={{ flex: '1', margin: 0 }}>
-                <label>Maximum Proxy Bid (Optional)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  className="input-field" 
-                  value={proxyMax} onChange={e => setProxyMax(e.target.value)} 
-                  placeholder="Set max auto-bid"
-                />
-              </div>
-              <button type="submit" className="btn" style={{ width: 'auto' }}>Place Bid</button>
-            </form>
-          </div>
+            {error && <div className="alert alert-danger">{error}</div>}
+            {success && <div className="alert alert-success">{success}</div>}
+
+            {token && !paymentVerified ? (
+              <PaymentVerification onVerified={() => {
+                setPaymentVerified(true);
+                setError('');
+                toast.success('Card verified. You can bid now.');
+              }} />
+            ) : (
+              <form onSubmit={handlePlaceBid} className="bid-form">
+                <div className="input-group" style={{ margin: 0 }}>
+                  <label htmlFor="bidAmount">Bid Amount ($)</label>
+                  <input
+                    id="bidAmount"
+                    type="number"
+                    step="0.01"
+                    className="input-field"
+                    value={bidAmount} onChange={e => setBidAmount(e.target.value)}
+                    required
+                    min={item.current_highest_bid ? parseFloat(item.current_highest_bid) + 0.01 : parseFloat(item.base_price)}
+                  />
+                </div>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <label htmlFor="proxyMax">Maximum Proxy Bid (Optional)</label>
+                  <input
+                    id="proxyMax"
+                    type="number"
+                    step="0.01"
+                    className="input-field"
+                    value={proxyMax} onChange={e => setProxyMax(e.target.value)}
+                    placeholder="Set max auto-bid"
+                  />
+                </div>
+                <motion.button whileTap={{ scale: 0.96 }} type="submit" className="btn btn-accent">Place Bid</motion.button>
+              </form>
+            )}
+          </section>
         )}
-        
+
         {item.user_id === user.id && (
-          <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', color: 'var(--text-muted)', textAlign: 'center' }}>
-            You are the owner of this item. You cannot bid on it.
+          <div className="owner-note">You are the owner of this item. You cannot bid on it.</div>
+        )}
+
+        {isEnded && item.payment && (
+          <div className={`alert ${item.payment.status === 'succeeded' ? 'alert-success' : 'alert-danger'}`} style={{ marginTop: '1rem' }}>
+            Payment status: {item.payment.status}
+            {item.payment.failure_reason ? ` - ${item.payment.failure_reason}` : ''}
           </div>
         )}
 
         {isEnded && item.highest_bidder_username === user.username && (
-          <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid var(--glass-border)' }}>
-            <h3>You won this auction! 🎉</h3>
+          <section style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+            <h3>You won this auction!</h3>
             {!hasReviewed ? (
               <form onSubmit={handleSubmitReview} style={{ marginTop: '1rem' }}>
                 <div className="input-group">
-                  <label>Rate the Seller</label>
-                  <select className="input-field" value={reviewRating} onChange={e => setReviewRating(e.target.value)} style={{ background: 'rgba(15, 23, 42, 0.9)' }}>
+                  <label htmlFor="reviewRating">Rate the Seller</label>
+                  <select id="reviewRating" className="input-field" value={reviewRating} onChange={e => setReviewRating(e.target.value)}>
                     <option value="5">5 - Excellent</option>
                     <option value="4">4 - Good</option>
                     <option value="3">3 - Average</option>
@@ -316,42 +381,50 @@ function ItemDetails() {
                   </select>
                 </div>
                 <div className="input-group">
-                  <label>Comment (Optional)</label>
-                  <textarea className="input-field" rows="3" value={reviewComment} onChange={e => setReviewComment(e.target.value)}></textarea>
+                  <label htmlFor="reviewComment">Comment (Optional)</label>
+                  <textarea id="reviewComment" className="input-field" rows="3" value={reviewComment} onChange={e => setReviewComment(e.target.value)}></textarea>
                 </div>
-                <button type="submit" className="btn" style={{ width: 'auto' }}>Submit Review</button>
+                <button type="submit" className="btn btn-accent">Submit Review</button>
               </form>
             ) : (
-              <p style={{ color: 'var(--success)', marginTop: '1rem' }}>✓ You have reviewed the seller for this transaction.</p>
+              <p className="alert alert-success" style={{ marginTop: '1rem' }}>You have reviewed the seller for this transaction.</p>
+            )}
+          </section>
+        )}
+      </main>
+
+      <aside className="side-stack">
+        <div className="glass-card">
+          <h3>Bid History</h3>
+          <div className="bid-history">
+            {bids.length === 0 ? (
+              <p className="section-copy">No bids yet. Be the first.</p>
+            ) : (
+              <AnimatePresence initial={false}>
+                {bids.map(bid => (
+                  <motion.div
+                    key={bid.id}
+                    className="bid-row"
+                    initial={{ opacity: 0, x: 18 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -12 }}
+                    transition={{ duration: 0.22 }}
+                  >
+                    <div>
+                      <strong>{bid.username}</strong>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {new Date(bid.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="price-sm">${parseFloat(bid.amount).toFixed(2)}</div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             )}
           </div>
-        )}
-      </div>
-
-      {/* Sidebar - Bid History */}
-      <div className="glass-card" style={{ height: 'fit-content' }}>
-        <h3>Bid History</h3>
-        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {bids.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)' }}>No bids yet. Be the first!</p>
-          ) : (
-            bids.map(bid => (
-              <div key={bid.id} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <div>
-                  <span style={{ fontWeight: 'bold' }}>{bid.username}</span>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {new Date(bid.created_at).toLocaleString()}
-                  </div>
-                </div>
-                <div style={{ fontWeight: 'bold', color: 'var(--success)' }}>
-                  ${parseFloat(bid.amount).toFixed(2)}
-                </div>
-              </div>
-            ))
-          )}
         </div>
-      </div>
-    </div>
+      </aside>
+    </motion.div>
   );
 }
 

@@ -70,7 +70,8 @@ def login():
             'username': user['username'],
             'email': user['email'],
             'phone_number': user['phone'],
-            'is_admin': bool(user.get('is_admin'))
+            'is_admin': bool(user.get('is_admin')),
+            'payment_verified': bool(user.get('payment_verified'))
         }
         
         return jsonify({'token': token, 'user': user_data}), 200

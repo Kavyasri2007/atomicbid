@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import axios from 'axios';
 
 function CreateItem() {
@@ -45,9 +46,15 @@ function CreateItem() {
   };
 
   return (
-    <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
-      <h2>Create New Auction</h2>
-      {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</div>}
+    <motion.div
+      className="glass-card form-card"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32 }}
+    >
+      <div className="eyebrow">Seller console</div>
+      <h2 style={{ marginBottom: '1.25rem' }}>Create New Auction</h2>
+      {error && <div className="alert alert-danger">{error}</div>}
       
       <form onSubmit={handleCreate}>
         <div className="input-group">
@@ -100,7 +107,7 @@ function CreateItem() {
           />
         </div>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div className="split-fields">
           <div className="input-group">
             <label>Starting Price ($)</label>
             <input 
@@ -130,9 +137,9 @@ function CreateItem() {
           </div>
         </div>
         
-        <button type="submit" className="btn" style={{ marginTop: '1rem' }}>List Item</button>
+        <motion.button whileTap={{ scale: 0.97 }} type="submit" className="btn btn-accent" style={{ marginTop: '1rem', width: '100%' }}>List Item</motion.button>
       </form>
-    </div>
+    </motion.div>
   );
 }
 

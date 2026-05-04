@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 function Navbar() {
   const navigate = useNavigate();
@@ -12,25 +13,40 @@ function Navbar() {
   };
 
   return (
-    <nav className="navbar">
-      <Link to="/" className="nav-brand">Atomicbid</Link>
+    <motion.nav
+      className="navbar"
+      initial={{ y: -18, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+    >
+      <Link to="/" className="nav-brand" aria-label="Atomicbid home">
+        <span className="brand-mark">A</span>
+        Atomicbid
+      </Link>
       <div className="nav-links">
         {token ? (
           <>
-            <span className="nav-link">Welcome, {user.username}</span>
+            <span className="nav-link nav-user">Welcome, {user.username}</span>
             <Link to="/profile" className="nav-link">Profile</Link>
-            {user.is_admin && <Link to="/admin" className="nav-link" style={{ color: 'var(--secondary)' }}>Admin</Link>}
-            <Link to="/create-item" className="btn btn-secondary" style={{padding: '8px 16px', display: 'inline-block'}}>Create Auction</Link>
-            <button onClick={handleLogout} className="btn" style={{width: 'auto', padding: '8px 16px'}}>Logout</button>
+            {user.is_admin && <Link to="/admin" className="nav-link">Admin</Link>}
+            <Link to="/create-item" className="btn btn-secondary">Create Auction</Link>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleLogout}
+              className="btn"
+              type="button"
+            >
+              Logout
+            </motion.button>
           </>
         ) : (
           <>
             <Link to="/login" className="nav-link">Login</Link>
-            <Link to="/register" className="btn" style={{width: 'auto', padding: '8px 16px'}}>Register</Link>
+            <Link to="/register" className="btn btn-accent">Register</Link>
           </>
         )}
       </div>
-    </nav>
+    </motion.nav>
   );
 }
 

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from database import get_db_connection
 from utils import token_required
+from services.payments import close_expired_auctions
 
 users_bp = Blueprint('users', __name__)
 
@@ -11,6 +12,9 @@ def get_user_dashboard(current_user_id):
     cursor = conn.cursor()
     
     try:
+        close_expired_auctions(cursor)
+        conn.commit()
+
         # My Auctions
         cursor.execute("""
             SELECT i.*, u.username as owner_username, hb.username as highest_bidder_username
@@ -79,12 +83,21 @@ def get_user_dashboard(current_user_id):
                 item['created_at'] = item['created_at'].isoformat() + "Z"
             return items_list
 
+        cursor.execute("""
+            SELECT payment_verified, payment_verified_at
+            FROM users
+            WHERE id = %s
+        """, (current_user_id,))
+        payment_user = cursor.fetchone()
+
         return jsonify({
             'my_auctions': format_items(my_auctions),
             'my_bids': format_items(my_active_bids),
             'won_auctions': format_items(won_auctions),
             'lost_auctions': format_items(lost_auctions),
-            'watchlist': format_items(watchlist)
+            'watchlist': format_items(watchlist),
+            'payment_verified': bool(payment_user and payment_user.get('payment_verified')),
+            'payment_verified_at': payment_user['payment_verified_at'].isoformat() + "Z" if payment_user and payment_user.get('payment_verified_at') else None
         })
 
     except Exception as e:
